@@ -270,25 +270,6 @@ func mock(w http.ResponseWriter, r *http.Request, route *Route) int {
         }
     }
 
-    /*
-    ret := struct {
-        Url    string      `json:"url"`
-        Method string      `json:"method"`
-        Body   interface{} `json:"body"`
-        Result interface{} `json:"result"`
-    } {
-        Url:    r.URL.String(),
-        Method: r.Method,
-        Body:   data,
-        Result: route.MockResponse.Result,
-    }
-
-    if *debug {
-        log.Println("reply:")
-        PrettyPrintAsJson(ret)
-    }
-     */
-
     result = HandleResponse{
         Result:  route.MockResponse.Result,
         Code:    route.MockResponse.Code,

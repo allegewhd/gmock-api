@@ -1,0 +1,16 @@
+{
+  "apis": [
+    {
+      "paths":       ["/info", "/status"],
+      "methods":     ["GET"],
+      "mock_result": {
+        "result": {
+          "name": "okj-mock-api",
+          "version": ".0.9.5",
+          "description": "mock rest api tool"
+        },
+        "status_code": 200
+      }
+    }
+  ]
+}

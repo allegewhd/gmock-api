@@ -1,13 +1,48 @@
 {
   "apis": [
     {
-      "paths":       ["/info", "/status"],
-      "methods":     ["GET"],
-      "mock_result": {
+      "paths":         ["/info", "/status"],
+      "methods":       ["GET"],
+      "mock_response": {
         "result": {
-          "name": "okj-mock-api",
+          "name": "magic-mock-api",
           "version": ".0.9.5",
           "description": "mock rest api tool"
+        },
+        "status_code": 200
+      }
+    },
+    {
+      "paths":         ["/register"],
+      "methods":       ["POST", "PUT"],
+      "mock_response": {
+        "result": {
+          "act_type": 1,
+          "status": "success",
+          "register_id": "a99f391852caf97496e7a5ad27a7f295ecc194061b490985959472f3da3d00fb"
+        },
+        "status_code": 200
+      }
+    },
+    {
+      "paths":         ["/heartbeat"],
+      "methods":       ["POST"],
+      "mock_response": {
+        "result": {
+          "act_type": 1,
+          "status": "success",
+          "message": "OK, keep in touch"
+        },
+        "status_code": 200
+      }
+    },
+    {
+      "paths":         ["/notify"],
+      "methods":       ["POST"],
+      "mock_response": {
+        "result": {
+          "act_type": 1,
+          "status": "acknowledged"
         },
         "status_code": 200
       }

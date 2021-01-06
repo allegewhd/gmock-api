@@ -3,16 +3,16 @@ package main
 import (
     "context"
     "encoding/json"
-    "fmt"
     "flag"
+    "fmt"
     "io"
     "io/ioutil"
     "log"
     "net/http"
     "os"
     "os/signal"
-    "strings"
     "strconv"
+    "strings"
     "syscall"
     "time"
 )
@@ -31,7 +31,11 @@ type HandleResponse struct {
 type Route struct {
     Path         []string       `json:"paths"`           // multiple url with same handler
     Method       []string       `json:"methods"`
-    MockResult   HandleResponse `json:"mock_result"`
+    MockResponse HandleResponse `json:"mock_response"`
+}
+
+type Config struct {
+    APIs         []Route        `json:"apis"`
 }
 
 var (
@@ -42,7 +46,7 @@ var (
 )
 
 var (
-    config map[string]interface{}
+    config *Config
 )
 
 func main() {
@@ -106,8 +110,8 @@ func loadConfig(filename string) error {
         return err
     }
 
-    config = make(map[string]interface{})
-    err = json.Unmarshal(dataBytes, &config)
+    config = &Config{}
+    err = json.Unmarshal(dataBytes, config)
     if err != nil {
         return err
     }
@@ -135,7 +139,28 @@ func ExistsInList(list []string, element string) bool {
 
 func writeResult(w http.ResponseWriter, r HandleResponse) int {
     w.WriteHeader(r.Code)
-    json.NewEncoder(w).Encode(r)
+
+    ret := r.Result
+    wrap := struct {
+        Message string      `json:"message"`
+    }{}
+    switch v := ret.(type) {
+    case bool:
+        wrap.Message = fmt.Sprintf("%v", v)
+        json.NewEncoder(w).Encode(wrap)
+    case float64:
+        wrap.Message = fmt.Sprintf("%v", v)
+        json.NewEncoder(w).Encode(wrap)
+    case int:
+        wrap.Message = fmt.Sprintf("%v", v)
+        json.NewEncoder(w).Encode(wrap)
+    case string:
+        wrap.Message = fmt.Sprintf("%v", v)
+        json.NewEncoder(w).Encode(wrap)
+    default:
+        json.NewEncoder(w).Encode(r.Result)
+    }
+
     return r.Code
 }
 
@@ -162,10 +187,8 @@ func DefaultHandler(w http.ResponseWriter, r *http.Request) {
     w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
     url := r.URL.Path
-    routes := config["apis"].([]interface{})
     found := false
-    for _, routeDef := range routes {
-        route := routeDef.(Route)
+    for _, route := range config.APIs {
         for _, path := range route.Path {
             if strings.HasPrefix(url, path) {
                 found = true
@@ -177,7 +200,7 @@ func DefaultHandler(w http.ResponseWriter, r *http.Request) {
     if !found {
         log.Printf("not found handler for url: %v\n", url)
         statusCode = writeResult(w, HandleResponse{
-            Result: fmt.Sprintf("Unsupported URL %v", url),
+            Result:  fmt.Sprintf("Unsupported URL %v", url),
             Code:    http.StatusBadRequest,
         })
     }
@@ -203,63 +226,72 @@ func mock(w http.ResponseWriter, r *http.Request, route *Route) int {
     }
 
     //To allocate slice for request body
-    length, err := strconv.Atoi(r.Header.Get("Content-Length"))
-    if err != nil {
-        log.Printf("error on get content length from request: %v\n", err)
-        if r.Method != http.MethodGet && r.Method != http.MethodHead {
-            result = HandleResponse{
-                Result:  "failed to get request length",
-                Code:    http.StatusInternalServerError,
-            }
-            return writeResult(w, result)
-        }
-    }
-
-    //Read body data to parse json
     var data interface{}
-
-    if length > 0 {
-        body := make([]byte, length)
-        length, err = r.Body.Read(body)
-        if err != nil && err != io.EOF {
-            result = HandleResponse{
-                Result:  "failed to read request body",
-                Code:    http.StatusInternalServerError,
-            }
-            return writeResult(w, result)
-        }
-
-        log.Printf("%v %v request body:%v\n", r.Method, r.URL, string(body))
-
-        err = json.Unmarshal(body[:length], &data)
+    if len(r.Header.Get("Content-Length"))  > 0 {
+        size, err := strconv.Atoi(r.Header.Get("Content-Length"))
         if err != nil {
-            result = HandleResponse{
-                Result:  "failed to parse request body to json object",
-                Code:    http.StatusInternalServerError,
+            log.Printf("error on get content length from request: %v\n", err)
+            if r.Method != http.MethodGet && r.Method != http.MethodHead {
+                result = HandleResponse{
+                    Result:  "failed to get request length",
+                    Code:    http.StatusInternalServerError,
+                }
+                return writeResult(w, result)
             }
-            return writeResult(w, result)
         }
 
-        PrettyPrintAsJson(data)
+        //Read body data to parse json
+        if size > 0 {
+            body := make([]byte, size)
+            size, err = r.Body.Read(body)
+            if err != nil && err != io.EOF {
+                result = HandleResponse{
+                    Result:  "failed to read request body",
+                    Code:    http.StatusInternalServerError,
+                }
+                return writeResult(w, result)
+            }
+
+            log.Printf("%v %v request body:%v\n", r.Method, r.URL, string(body))
+
+            err = json.Unmarshal(body[:size], &data)
+            if err != nil {
+                result = HandleResponse{
+                    Result:  "failed to parse request body to json object",
+                    Code:    http.StatusInternalServerError,
+                }
+                return writeResult(w, result)
+            }
+
+            if *debug {
+                log.Println("received:")
+                PrettyPrintAsJson(data)
+            }
+        }
     }
 
+    /*
     ret := struct {
-        Ack    string      `json:"ack"`
         Url    string      `json:"url"`
         Method string      `json:"method"`
         Body   interface{} `json:"body"`
         Result interface{} `json:"result"`
     } {
-        Ack:    "OK",
         Url:    r.URL.String(),
         Method: r.Method,
         Body:   data,
-        Result: route.MockResult,
+        Result: route.MockResponse.Result,
     }
 
+    if *debug {
+        log.Println("reply:")
+        PrettyPrintAsJson(ret)
+    }
+     */
+
     result = HandleResponse{
-        Result:  ret,
-        Code:    http.StatusOK,
+        Result:  route.MockResponse.Result,
+        Code:    route.MockResponse.Code,
     }
 
     return writeResult(w, result)

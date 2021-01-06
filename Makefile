@@ -22,14 +22,14 @@ GOXOS       := linux
 GOXARCH     := amd64
 GOXOUTPUT   := $(PKGDIR)/$(GOXOS)_$(GOXARCH)/$(NAME)
 
-INSTALLHOST := me.nginx
-INSTALLPATH := /data/okcoin/okj-agent
+INSTALLHOST := your_server
+INSTALLPATH := /you/server/bin/path
 
 
 all: help
 
 help:
-	@echo "Build and distribute okj-agent app"
+	@echo "Build and distribute mock api server"
 	@echo "    prepare                    check golang env"
 	@echo "    init                       init mod"
 	@echo "    run                        run main file"

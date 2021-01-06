@@ -68,7 +68,7 @@ Usage of ./build/bin/mockapi:
     	agent server port (default 7001)
 ```
 
-curl your favor rest tool to access `http://localhost:700/info`
+use your favor rest tool to access `http://localhost:700/info`
 ```bash
 $ curl -s http://localhost:7001/info | jq
   # get sample

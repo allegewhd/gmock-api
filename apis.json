@@ -1,14 +1,16 @@
 {
   "settings": {
-    "strict_mode": true
+    "strict_mode":          true,
+    "default_content_type": "application/json"
   },
   "apis": [
     {
-      "paths":         ["/info", "/status"],
-      "methods":       ["GET"],
-      "accept":        ["all"],
-      "mock_response": {
-        "result": {
+      "path":         ["/info", "/status"],
+      "method":       ["GET"],
+      "accept":       ["all"],
+      "response":     {
+        "content_type": "application/json",
+        "data": {
           "name": "magic-mock-api",
           "version": ".0.9.5",
           "description": "mock rest api tool"
@@ -17,11 +19,12 @@
       }
     },
     {
-      "paths":         ["/register"],
-      "methods":       ["POST", "PUT"],
+      "path":         ["/register"],
+      "method":       ["POST", "PUT"],
       "accept":        ["application/json", "application/x-www-form-urlencoded"],
-      "mock_response": {
-        "result": {
+      "response":      {
+        "content_type": "application/json",
+        "data": {
           "act_type": 1,
           "status": "success",
           "register_id": "a99f391852caf97496e7a5ad27a7f295ecc194061b490985959472f3da3d00fb"
@@ -30,11 +33,12 @@
       }
     },
     {
-      "paths":         ["/heartbeat"],
-      "methods":       ["POST"],
+      "path":         ["/heartbeat"],
+      "method":       ["POST"],
       "accept":        ["application/json", "application/x-www-form-urlencoded", "text/html", "application/octet-stream", "text/plain"],
-      "mock_response": {
-        "result": {
+      "response":      {
+        "content_type": "application/json",
+        "data": {
           "act_type": 1,
           "status": "success",
           "message": "OK, keep in touch"
@@ -43,11 +47,12 @@
       }
     },
     {
-      "paths":         ["/notify"],
-      "methods":       ["POST"],
+      "path":         ["/notify"],
+      "method":       ["POST"],
       "accept":        ["all"],
-      "mock_response": {
-        "result": {
+      "response":      {
+        "content_type": "application/json",
+        "data": {
           "act_type": 1,
           "status": "acknowledged"
         },
@@ -55,13 +60,26 @@
       }
     },
     {
-      "paths":         ["/foo"],
-      "methods":       ["POST"],
+      "path":         ["/foo"],
+      "method":       ["POST"],
       "accept":        ["application/json"],
-      "mock_response": {
-        "result": {
+      "response":      {
+        "content_type": "application/json",
+        "data": {
           "bar": "okay",
           "message": "test accept type"
+        },
+        "status_code": 200
+      }
+    },
+    {
+      "path":         ["/btc"],
+      "method":       ["GET","POST"],
+      "accept":        ["all"],
+      "response":      {
+        "content_type": "text/plain",
+        "data": {
+          "welcome": "buy btc now"
         },
         "status_code": 200
       }

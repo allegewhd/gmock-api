@@ -23,16 +23,17 @@ const (
 
 type ShutdownHook func()
 
-type HandleResponse struct {
-	Result interface{} `json:"result"`
-	Code   int         `json:"status_code"`
+type MockResponse struct {
+    Type         string         `json:"content_type"`
+	Data         interface{}    `json:"data"`
+	Code         int            `json:"status_code"`
 }
 
 type Route struct {
-	Path         []string       `json:"paths"` // multiple url with same handler
-	Method       []string       `json:"methods"`
+	Path         []string       `json:"path"`
+	Method       []string       `json:"method"`
 	Accept       []string       `json:"accept"`
-	MockResponse HandleResponse `json:"mock_response"`
+	Response     MockResponse   `json:"response"`
 }
 
 type Config struct {
@@ -152,30 +153,35 @@ func isAcceptableReqType(list []string, element string) bool {
 	return false
 }
 
-func writeResult(w http.ResponseWriter, r HandleResponse) int {
+func writeResult(w http.ResponseWriter, r MockResponse) int {
+	w.Header().Set("Content-Type", r.Type)
 	w.WriteHeader(r.Code)
 
-	ret := r.Result
-	wrap := struct {
-		Message string `json:"message"`
-	}{}
-	switch v := ret.(type) {
-	case bool:
-		wrap.Message = fmt.Sprintf("%v", v)
-		_ = json.NewEncoder(w).Encode(wrap)
-	case float64:
-		wrap.Message = fmt.Sprintf("%v", v)
-		_ = json.NewEncoder(w).Encode(wrap)
-	case int:
-		wrap.Message = fmt.Sprintf("%v", v)
-		_ = json.NewEncoder(w).Encode(wrap)
-	case string:
-		wrap.Message = fmt.Sprintf("%v", v)
-		_ = json.NewEncoder(w).Encode(wrap)
-	default:
-		_ = json.NewEncoder(w).Encode(r.Result)
+	ret := r.Data
+
+	if *debug {
+		log.Println("write response body:")
+		printAsJson(ret)
 	}
 
+	if strings.Contains(r.Type, "application/json") {
+		wrap := struct {
+			Message string `json:"message"`
+		}{}
+		switch v := ret.(type) {
+		case bool, float64, int, string:
+			wrap.Message = fmt.Sprintf("%v", v)
+			_ = json.NewEncoder(w).Encode(wrap)
+		default:
+			_ = json.NewEncoder(w).Encode(ret)
+		}
+	} else {
+		// default to text/plain
+		_, err := w.Write([]byte(fmt.Sprintf("%s", ret)))
+		if err != nil {
+			log.Printf("Error on write %v to response stream.\n", ret)
+		}
+	}
 	return r.Code
 }
 
@@ -203,25 +209,38 @@ func checkRequest(r *http.Request, route *Route) bool {
 func defaultHandler(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	statusCode := http.StatusOK
-
-	// force json
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	defaultContentType := config.Settings["default_content_type"].(string)
 
 	url := r.URL.Path
 	found := false
 	for _, route := range config.APIs {
 		for _, path := range route.Path {
+			if url == path {
+				found = true
+				statusCode = mock(w, r, &route)
+				break
+			}
+		}
+
+		if found {
+			break
+		}
+
+		// try to find prefix match definition
+		for _, path := range route.Path {
 			if strings.HasPrefix(url, path) {
 				found = true
 				statusCode = mock(w, r, &route)
+				break
 			}
 		}
 	}
 
 	if !found {
 		log.Printf("not found handler for url: %v\n", url)
-		statusCode = writeResult(w, HandleResponse{
-			Result: fmt.Sprintf("Unsupported URL %v", url),
+		statusCode = writeResult(w, MockResponse{
+			Type:   defaultContentType,
+			Data:   fmt.Sprintf("Unsupported URL %v", url),
 			Code:   http.StatusBadRequest,
 		})
 	}
@@ -233,8 +252,9 @@ func defaultHandler(w http.ResponseWriter, r *http.Request) {
 
 func mock(w http.ResponseWriter, r *http.Request, route *Route) int {
 	if !checkRequest(r, route) {
-		return writeResult(w, HandleResponse{
-			Result: fmt.Sprintf("Illegal request: %v %v", r.Method, r.URL.Path),
+		return writeResult(w, MockResponse{
+			Type:   route.Response.Type,
+			Data:   fmt.Sprintf("Illegal request: %v %v", r.Method, r.URL.Path),
 			Code:   http.StatusBadRequest,
 		})
 	}
@@ -249,8 +269,9 @@ func mock(w http.ResponseWriter, r *http.Request, route *Route) int {
 		if err != nil {
 			log.Printf("error on get content length from request: %v\n", err)
 			if r.Method != http.MethodGet && r.Method != http.MethodHead {
-				return writeResult(w, HandleResponse{
-					Result: "failed to get request length",
+				return writeResult(w, MockResponse{
+					Type:   route.Response.Type,
+					Data:   "failed to get request length",
 					Code:   http.StatusInternalServerError,
 				})
 			}
@@ -261,8 +282,9 @@ func mock(w http.ResponseWriter, r *http.Request, route *Route) int {
 			body := make([]byte, size)
 			size, err = r.Body.Read(body)
 			if err != nil && err != io.EOF {
-				return writeResult(w, HandleResponse{
-					Result: "failed to read request body",
+				return writeResult(w, MockResponse{
+					Type:   route.Response.Type,
+					Data: "failed to read request body",
 					Code:   http.StatusInternalServerError,
 				})
 			}
@@ -272,8 +294,9 @@ func mock(w http.ResponseWriter, r *http.Request, route *Route) int {
 			var data interface{}
 			err = json.Unmarshal(body[:size], &data)
 			if err != nil {
-				return writeResult(w, HandleResponse{
-					Result: "failed to parse request body to json object",
+				return writeResult(w, MockResponse{
+					Type:   route.Response.Type,
+					Data: "failed to parse request body to json object",
 					Code:   http.StatusInternalServerError,
 				})
 			}
@@ -285,8 +308,5 @@ func mock(w http.ResponseWriter, r *http.Request, route *Route) int {
 		}
 	}
 
-	return writeResult(w, HandleResponse{
-		Result: route.MockResponse.Result,
-		Code:   route.MockResponse.Code,
-	})
+	return writeResult(w, route.Response)
 }

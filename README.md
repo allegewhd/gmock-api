@@ -27,22 +27,12 @@ $ make run
 {
   "apis": [
     {
-      "paths":         ["/info", "/status"],
-      "methods":       ["GET"],
-      "mock_response": {
-        "result": {
-          "name": "magic-mock-api",
-          "version": ".0.9.5",
-          "description": "mock rest api tool"
-        },
-        "status_code": 200
-      }
-    },
-    {
-      "paths":         ["/register"],
-      "methods":       ["POST", "PUT"],
-      "mock_response": {
-        "result": {
+      "path":         ["/register", "/new"],
+      "method":       ["POST", "PUT"],
+      "accept":       ["application/json", "application/x-www-form-urlencoded"],
+      "response":     {
+        "content_type": "application/json",
+        "data": {
           "act_type": 1,
           "status": "success",
           "register_id": "a99f391852caf97496e7a5ad27a7f295ecc194061b490985959472f3da3d00fb"
@@ -54,6 +44,14 @@ $ make run
   ]
 }
 ```
+
++ **path** API url, multiple support
++ **method** support method list
++ **accept** required request methods
++ **response** mock response
+  + **content_type** response content type
+  + **data** response body
+  + **status_code** response code
 
 ### test 
 run with `--help` to show usage.

@@ -1,11 +1,12 @@
 {
   "settings": {
-    "strict_mode": false
+    "strict_mode": true
   },
   "apis": [
     {
       "paths":         ["/info", "/status"],
       "methods":       ["GET"],
+      "accept":        ["all"],
       "mock_response": {
         "result": {
           "name": "magic-mock-api",
@@ -18,6 +19,7 @@
     {
       "paths":         ["/register"],
       "methods":       ["POST", "PUT"],
+      "accept":        ["application/json", "application/x-www-form-urlencoded"],
       "mock_response": {
         "result": {
           "act_type": 1,
@@ -30,6 +32,7 @@
     {
       "paths":         ["/heartbeat"],
       "methods":       ["POST"],
+      "accept":        ["application/json", "application/x-www-form-urlencoded", "text/html", "application/octet-stream", "text/plain"],
       "mock_response": {
         "result": {
           "act_type": 1,
@@ -42,10 +45,23 @@
     {
       "paths":         ["/notify"],
       "methods":       ["POST"],
+      "accept":        ["all"],
       "mock_response": {
         "result": {
           "act_type": 1,
           "status": "acknowledged"
+        },
+        "status_code": 200
+      }
+    },
+    {
+      "paths":         ["/foo"],
+      "methods":       ["POST"],
+      "accept":        ["application/json"],
+      "mock_response": {
+        "result": {
+          "bar": "okay",
+          "message": "test accept type"
         },
         "status_code": 200
       }

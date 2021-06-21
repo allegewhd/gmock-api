@@ -31,12 +31,13 @@ type HandleResponse struct {
 type Route struct {
 	Path         []string       `json:"paths"` // multiple url with same handler
 	Method       []string       `json:"methods"`
+	Accept       []string       `json:"accept"`
 	MockResponse HandleResponse `json:"mock_response"`
 }
 
 type Config struct {
-    Settings    map[string]interface{}   `json:"settings"`
-	APIs        []Route                  `json:"apis"`
+	Settings map[string]interface{} `json:"settings"`
+	APIs     []Route                `json:"apis"`
 }
 
 var (
@@ -138,6 +139,19 @@ func contains(list []string, element string) bool {
 	return false
 }
 
+func isAcceptableReqType(list []string, element string) bool {
+	for _, el := range list {
+		if el == "all" {
+			return true
+		}
+		if strings.Contains(element, el) {
+			return true
+		}
+	}
+
+	return false
+}
+
 func writeResult(w http.ResponseWriter, r HandleResponse) int {
 	w.WriteHeader(r.Code)
 
@@ -166,21 +180,20 @@ func writeResult(w http.ResponseWriter, r HandleResponse) int {
 }
 
 func checkRequest(r *http.Request, route *Route) bool {
-    strictMode := config.Settings["strict_mode"].(bool)
+	strictMode := config.Settings["strict_mode"].(bool)
 
-    if !strictMode {
-        return true
-    }
+	if !strictMode {
+		return true
+	}
 
 	if !contains(route.Method, r.Method) {
 		log.Printf("Illegal method: %v for %v, only allowed %v\n", r.Method, r.URL.Path, route.Method)
 		return false
 	}
 
-	if r.Method != http.MethodGet && r.Method != http.MethodHead &&
-		!strings.Contains(r.Header.Get("Content-Type"), "application/json") {
-		// must be json request except GET or HEAD
-		log.Printf("Not json request: %v\n", r.Header.Get("Content-Type"))
+	reqType := r.Header.Get("Content-Type")
+	if !isAcceptableReqType(route.Accept, reqType) {
+		log.Printf("Not acceptable request type. expected: [%v] actual: [%v]\n", route.Accept, reqType)
 		return false
 	}
 
@@ -228,7 +241,7 @@ func mock(w http.ResponseWriter, r *http.Request, route *Route) int {
 
 	log.Printf("MOCK API: %v %v\n", r.Method, r.URL)
 
-    strictMode := config.Settings["strict_mode"].(bool)
+	strictMode := config.Settings["strict_mode"].(bool)
 
 	if strictMode && len(r.Header.Get("Content-Length")) > 0 {
 		// parse request body

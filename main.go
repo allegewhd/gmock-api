@@ -35,7 +35,8 @@ type Route struct {
 }
 
 type Config struct {
-	APIs []Route `json:"apis"`
+    Settings    map[string]interface{}   `json:"settings"`
+	APIs        []Route                  `json:"apis"`
 }
 
 var (
@@ -165,6 +166,12 @@ func writeResult(w http.ResponseWriter, r HandleResponse) int {
 }
 
 func checkRequest(r *http.Request, route *Route) bool {
+    strictMode := config.Settings["strict_mode"].(bool)
+
+    if !strictMode {
+        return true
+    }
+
 	if !contains(route.Method, r.Method) {
 		log.Printf("Illegal method: %v for %v, only allowed %v\n", r.Method, r.URL.Path, route.Method)
 		return false
@@ -221,7 +228,9 @@ func mock(w http.ResponseWriter, r *http.Request, route *Route) int {
 
 	log.Printf("MOCK API: %v %v\n", r.Method, r.URL)
 
-	if len(r.Header.Get("Content-Length")) > 0 {
+    strictMode := config.Settings["strict_mode"].(bool)
+
+	if strictMode && len(r.Header.Get("Content-Length")) > 0 {
 		// parse request body
 		size, err := strconv.Atoi(r.Header.Get("Content-Length"))
 		if err != nil {

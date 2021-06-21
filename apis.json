@@ -1,4 +1,7 @@
 {
+  "settings": {
+    "strict_mode": false
+  },
   "apis": [
     {
       "paths":         ["/info", "/status"],

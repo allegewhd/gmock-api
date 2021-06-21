@@ -262,6 +262,7 @@ func mock(w http.ResponseWriter, r *http.Request, route *Route) int {
 	log.Printf("MOCK API: %v %v\n", r.Method, r.URL)
 
 	strictMode := config.Settings["strict_mode"].(bool)
+	reqType := r.Header.Get("Content-Type")
 
 	if strictMode && len(r.Header.Get("Content-Length")) > 0 {
 		// parse request body
@@ -291,19 +292,21 @@ func mock(w http.ResponseWriter, r *http.Request, route *Route) int {
 
 			log.Printf("%v %v request body:%v\n", r.Method, r.URL, string(body))
 
-			var data interface{}
-			err = json.Unmarshal(body[:size], &data)
-			if err != nil {
-				return writeResult(w, MockResponse{
-					Type:   route.Response.Type,
-					Data: "failed to parse request body to json object",
-					Code:   http.StatusInternalServerError,
-				})
-			}
+			if strings.Contains(reqType, "application/json") {
+				var data interface{}
+				err = json.Unmarshal(body[:size], &data)
+				if err != nil {
+					return writeResult(w, MockResponse{
+						Type:   route.Response.Type,
+						Data: "failed to parse request body to json object",
+						Code:   http.StatusInternalServerError,
+					})
+				}
 
-			if *debug {
-				log.Println("received:")
-				printAsJson(data)
+				if *debug {
+					log.Println("received:")
+					printAsJson(data)
+				}
 			}
 		}
 	}

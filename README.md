@@ -1,6 +1,6 @@
 # gmock-api
 
-A tool for Rest API test. No dependencies are required.
+A tool for Rest API test by mock API response. No dependencies are required.
 
 ## usage
 

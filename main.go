@@ -36,14 +36,14 @@ type Endpoint struct {
 	URL     string                 `json:"url"`
 	Method  string                 `json:"method"`
 	Headers map[string]interface{} `json:"headers,omitempty"`
-	Data    map[string]interface{} `json:"data,omitempty"`
+	Data    interface{}            `json:"data,omitempty"`
 }
 
 type Route struct {
 	Path     []string     `json:"path"`
 	Method   []string     `json:"method"`
 	Accept   []string     `json:"accept"`
-	Callback Endpoint     `json:"callback"`
+	Callback Endpoint     `json:"callback,omitempty"`
 	Response MockResponse `json:"response"`
 }
 
@@ -276,6 +276,20 @@ func mock(w http.ResponseWriter, r *http.Request, route *Route) int {
 	log.Printf("MOCK API: %v %v with Content-Type %v\n", r.Method, r.URL, reqType)
 
 	// callback
+	if *debug {
+		printAsJson(route.Callback)
+	}
+	if route.Callback.URL != "" && route.Callback.Method != "" {
+		err := sendRequest(route.Callback)
+		if err != nil {
+			log.Printf("error on executing callback %v for %v error:\n %v\n", route.Callback.URL, r.URL, err)
+			return writeResult(w, MockResponse{
+				Type: route.Response.Type,
+				Data: "error on executing callback",
+				Code: http.StatusInternalServerError,
+			})
+		}
+	}
 
 	if strictMode && len(r.Header.Get("Content-Length")) > 0 {
 		// parse request body

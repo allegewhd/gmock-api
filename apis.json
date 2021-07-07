@@ -30,6 +30,13 @@
           "register_id": "a99f391852caf97496e7a5ad27a7f295ecc194061b490985959472f3da3d00fb"
         },
         "status_code": 200
+      },
+      "callback":     {
+        "url": "http://localhost:7001/status",
+        "method": "GET",
+        "headers": {
+          "Content-Type": "application/json; charset=utf-8"
+        }
       }
     },
     {
@@ -47,13 +54,13 @@
       },
       "callback":     {
         "url": "http://localhost:6001/app/status",
-        "method": "post",
+        "method": "POST",
         "headers": {
-            "Content-Type": "application/json; charset=utf-8"
+          "Content-Type": "application/json; charset=utf-8"
         },
         "data": {
-            "message": "hello OKJ asset",
-            "amount": 2021
+          "message": "hello OKJ asset",
+          "amount": 2021
         }
       }
     },

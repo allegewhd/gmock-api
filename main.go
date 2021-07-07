@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
@@ -8,6 +9,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -18,22 +20,31 @@ import (
 )
 
 const (
+	jsonContentType = "application/json; charset=utf-8"
 	ShutdownTimeout = 3 * time.Second
 )
 
 type ShutdownHook func()
 
 type MockResponse struct {
-    Type         string         `json:"content_type"`
-	Data         interface{}    `json:"data"`
-	Code         int            `json:"status_code"`
+	Type string      `json:"content_type"`
+	Data interface{} `json:"data"`
+	Code int         `json:"status_code"`
+}
+
+type Endpoint struct {
+	URL     string                 `json:"url"`
+	Method  string                 `json:"method"`
+	Headers map[string]interface{} `json:"headers,omitempty"`
+	Data    map[string]interface{} `json:"data,omitempty"`
 }
 
 type Route struct {
-	Path         []string       `json:"path"`
-	Method       []string       `json:"method"`
-	Accept       []string       `json:"accept"`
-	Response     MockResponse   `json:"response"`
+	Path     []string     `json:"path"`
+	Method   []string     `json:"method"`
+	Accept   []string     `json:"accept"`
+	Callback Endpoint     `json:"callback"`
+	Response MockResponse `json:"response"`
 }
 
 type Config struct {
@@ -239,9 +250,9 @@ func defaultHandler(w http.ResponseWriter, r *http.Request) {
 	if !found {
 		log.Printf("not found handler for url: %v\n", url)
 		statusCode = writeResult(w, MockResponse{
-			Type:   defaultContentType,
-			Data:   fmt.Sprintf("Unsupported URL %v", url),
-			Code:   http.StatusBadRequest,
+			Type: defaultContentType,
+			Data: fmt.Sprintf("Unsupported URL %v", url),
+			Code: http.StatusBadRequest,
 		})
 	}
 
@@ -253,16 +264,18 @@ func defaultHandler(w http.ResponseWriter, r *http.Request) {
 func mock(w http.ResponseWriter, r *http.Request, route *Route) int {
 	if !checkRequest(r, route) {
 		return writeResult(w, MockResponse{
-			Type:   route.Response.Type,
-			Data:   fmt.Sprintf("Illegal request: %v %v", r.Method, r.URL.Path),
-			Code:   http.StatusBadRequest,
+			Type: route.Response.Type,
+			Data: fmt.Sprintf("Illegal request: %v %v", r.Method, r.URL.Path),
+			Code: http.StatusBadRequest,
 		})
 	}
 
-	log.Printf("MOCK API: %v %v\n", r.Method, r.URL)
-
 	strictMode := config.Settings["strict_mode"].(bool)
 	reqType := r.Header.Get("Content-Type")
+
+	log.Printf("MOCK API: %v %v with Content-Type %v\n", r.Method, r.URL, reqType)
+
+	// callback
 
 	if strictMode && len(r.Header.Get("Content-Length")) > 0 {
 		// parse request body
@@ -271,9 +284,9 @@ func mock(w http.ResponseWriter, r *http.Request, route *Route) int {
 			log.Printf("error on get content length from request: %v\n", err)
 			if r.Method != http.MethodGet && r.Method != http.MethodHead {
 				return writeResult(w, MockResponse{
-					Type:   route.Response.Type,
-					Data:   "failed to get request length",
-					Code:   http.StatusInternalServerError,
+					Type: route.Response.Type,
+					Data: "failed to get request length",
+					Code: http.StatusInternalServerError,
 				})
 			}
 		}
@@ -284,9 +297,9 @@ func mock(w http.ResponseWriter, r *http.Request, route *Route) int {
 			size, err = r.Body.Read(body)
 			if err != nil && err != io.EOF {
 				return writeResult(w, MockResponse{
-					Type:   route.Response.Type,
+					Type: route.Response.Type,
 					Data: "failed to read request body",
-					Code:   http.StatusInternalServerError,
+					Code: http.StatusInternalServerError,
 				})
 			}
 
@@ -297,9 +310,9 @@ func mock(w http.ResponseWriter, r *http.Request, route *Route) int {
 				err = json.Unmarshal(body[:size], &data)
 				if err != nil {
 					return writeResult(w, MockResponse{
-						Type:   route.Response.Type,
+						Type: route.Response.Type,
 						Data: "failed to parse request body to json object",
-						Code:   http.StatusInternalServerError,
+						Code: http.StatusInternalServerError,
 					})
 				}
 
@@ -312,4 +325,143 @@ func mock(w http.ResponseWriter, r *http.Request, route *Route) int {
 	}
 
 	return writeResult(w, route.Response)
+}
+
+func createHttpClient() *http.Client {
+	// this is overkill
+	return &http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+		Transport: &http.Transport{
+			DialContext: (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ResponseHeaderTimeout: 10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+			MaxIdleConns:          10,
+			IdleConnTimeout:       30 * time.Second,
+			DisableCompression:    true,
+		},
+		Timeout: 60 * time.Second,
+	}
+}
+
+func get(client *http.Client, endpoint string, headers map[string]interface{}) (map[string]interface{}, error) {
+	if len(endpoint) == 0 {
+		return nil, fmt.Errorf("empty endpoint specified")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(headers) == 0 {
+		req.Header.Set("Content-Type", jsonContentType)
+	} else {
+		for key, val := range headers {
+			req.Header.Set(key, fmt.Sprintf("%v", val))
+		}
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get %v got %v", endpoint, resp.Status)
+	}
+
+	// Convert response body to struct
+	var result map[string]interface{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, err
+	}
+	if *debug {
+		log.Printf("get result %+v\n", result)
+	}
+
+	return result, nil
+}
+
+func post(client *http.Client, endpoint string, data interface{}, headers map[string]interface{}) error {
+	if len(endpoint) == 0 {
+		return fmt.Errorf("empty endpoint specified")
+	}
+
+	if data == nil {
+		return fmt.Errorf("empty data to post")
+	}
+
+	jsonPayload, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	if *debug {
+		log.Printf("post data:\n" + string(jsonPayload))
+	}
+
+	req, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewBuffer(jsonPayload))
+	if err != nil {
+		return err
+	}
+
+	if len(headers) == 0 {
+		req.Header.Set("Content-Type", jsonContentType)
+	} else {
+		for key, val := range headers {
+			req.Header.Set(key, fmt.Sprintf("%v", val))
+		}
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to post %v got %v", endpoint, resp.Status)
+	}
+
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	if *debug {
+		log.Printf("post result:\n" + string(bodyBytes))
+	}
+
+	return nil
+}
+
+func sendRequest(endpoint Endpoint) error {
+	client := createHttpClient()
+
+	log.Printf("access target: %v %v\n", endpoint.Method, endpoint.URL)
+
+	if strings.EqualFold(http.MethodGet, endpoint.Method) {
+		result, err := get(client, endpoint.URL, endpoint.Headers)
+		if err != nil {
+			return err
+		}
+		printAsJson(result)
+	} else if strings.EqualFold(http.MethodPost, endpoint.Method) {
+		err := post(client, endpoint.URL, endpoint.Data, endpoint.Headers)
+		if err != nil {
+			return err
+		}
+	} else {
+		log.Fatalf("unsupported method %v", endpoint.Method)
+	}
+
+	return nil
 }

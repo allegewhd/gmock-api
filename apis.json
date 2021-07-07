@@ -35,8 +35,8 @@
     {
       "path":         ["/heartbeat"],
       "method":       ["POST"],
-      "accept":        ["application/json", "application/x-www-form-urlencoded", "text/html", "application/octet-stream", "text/plain"],
-      "response":      {
+      "accept":       ["application/json", "application/x-www-form-urlencoded", "text/html", "application/octet-stream", "text/plain"],
+      "response":     {
         "content_type": "application/json",
         "data": {
           "act_type": 1,
@@ -44,13 +44,24 @@
           "message": "OK, keep in touch"
         },
         "status_code": 200
+      },
+      "callback":     {
+        "url": "http://localhost:6001/app/status",
+        "method": "post",
+        "headers": {
+            "Content-Type": "application/json; charset=utf-8"
+        },
+        "data": {
+            "message": "hello OKJ asset",
+            "amount": 2021
+        }
       }
     },
     {
       "path":         ["/notify"],
       "method":       ["POST"],
-      "accept":        ["all"],
-      "response":      {
+      "accept":       ["all"],
+      "response":     {
         "content_type": "application/json",
         "data": {
           "act_type": 1,

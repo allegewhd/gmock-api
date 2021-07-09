@@ -276,10 +276,11 @@ func mock(w http.ResponseWriter, r *http.Request, route *Route) int {
 	log.Printf("MOCK API: %v %v with Content-Type %v\n", r.Method, r.URL, reqType)
 
 	// callback
-	if *debug {
-		printAsJson(route.Callback)
-	}
 	if route.Callback.URL != "" && route.Callback.Method != "" {
+		if *debug {
+			log.Println("found callback:")
+			printAsJson(route.Callback)
+		}
 		err := sendRequest(route.Callback)
 		if err != nil {
 			log.Printf("error on executing callback %v for %v error:\n %v\n", route.Callback.URL, r.URL, err)

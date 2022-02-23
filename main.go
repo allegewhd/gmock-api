@@ -197,12 +197,6 @@ func writeResult(w http.ResponseWriter, r MockResponse) int {
 }
 
 func checkRequest(r *http.Request, route *Route) bool {
-	strictMode := config.Settings["strict_mode"].(bool)
-
-	if !strictMode {
-		return true
-	}
-
 	if !contains(route.Method, r.Method) {
 		log.Printf("Illegal method: %v for %v, only allowed %v\n", r.Method, r.URL.Path, route.Method)
 		return false
@@ -219,40 +213,24 @@ func checkRequest(r *http.Request, route *Route) bool {
 
 func defaultHandler(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
-	statusCode := http.StatusOK
+	statusCode := http.StatusBadRequest
 	defaultContentType := config.Settings["default_content_type"].(string)
 
-	url := r.URL.Path
 	found := false
 	for _, route := range config.APIs {
-		for _, path := range route.Path {
-			if url == path {
-				found = true
-				statusCode = mock(w, r, &route)
-				break
-			}
-		}
-
-		if found {
+		if contains(route.Path, r.URL.Path) && contains(route.Method, r.Method) {
+			found = true
+			statusCode = mock(w, r, &route)
 			break
-		}
-
-		// try to find prefix match definition
-		for _, path := range route.Path {
-			if strings.HasPrefix(url, path) {
-				found = true
-				statusCode = mock(w, r, &route)
-				break
-			}
 		}
 	}
 
 	if !found {
-		log.Printf("not found handler for url: %v\n", url)
+		log.Printf("not found handler for url: %v\n", r.URL.Path)
 		statusCode = writeResult(w, MockResponse{
 			Type: defaultContentType,
-			Data: fmt.Sprintf("Unsupported URL %v", url),
-			Code: http.StatusBadRequest,
+			Data: fmt.Sprintf("Unsupported URL %v", r.URL.Path),
+			Code: http.StatusNotFound,
 		})
 	}
 
@@ -265,7 +243,7 @@ func mock(w http.ResponseWriter, r *http.Request, route *Route) int {
 	if !checkRequest(r, route) {
 		return writeResult(w, MockResponse{
 			Type: route.Response.Type,
-			Data: fmt.Sprintf("Illegal request: %v %v", r.Method, r.URL.Path),
+			Data: fmt.Sprintf("Bad request: %v %v", r.Method, r.URL.Path),
 			Code: http.StatusBadRequest,
 		})
 	}

@@ -1,6 +1,5 @@
 {
   "settings": {
-    "strict_mode":          true,
     "default_content_type": "application/json"
   },
   "apis": [

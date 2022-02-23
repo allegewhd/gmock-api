@@ -226,6 +226,8 @@ func defaultHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !found {
+		// TODO add /help and /info handler
+
 		log.Printf("not found handler for url: %v\n", r.URL.Path)
 		statusCode = writeResult(w, MockResponse{
 			Type: defaultContentType,
@@ -248,7 +250,6 @@ func mock(w http.ResponseWriter, r *http.Request, route *Route) int {
 		})
 	}
 
-	strictMode := config.Settings["strict_mode"].(bool)
 	reqType := r.Header.Get("Content-Type")
 
 	log.Printf("MOCK API: %v %v with Content-Type %v\n", r.Method, r.URL, reqType)
@@ -269,7 +270,7 @@ func mock(w http.ResponseWriter, r *http.Request, route *Route) int {
 		}
 	}
 
-	if strictMode && len(r.Header.Get("Content-Length")) > 0 {
+	if len(r.Header.Get("Content-Length")) > 0 {
 		// parse request body
 		size, err := strconv.Atoi(r.Header.Get("Content-Length"))
 		if err != nil {

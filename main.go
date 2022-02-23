@@ -279,7 +279,7 @@ func mock(w http.ResponseWriter, r *http.Request, route *Route) int {
 	if *debug {
 		printAsJson(route.Callback)
 	}
-	if route.Callback.URL != "" && route.Callback.Method != "" {
+	if len(route.Callback.URL) > 0 && len(route.Callback.Method) > 0 {
 		err := sendRequest(route.Callback)
 		if err != nil {
 			log.Printf("error on executing callback %v for %v error:\n %v\n", route.Callback.URL, r.URL, err)

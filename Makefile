@@ -1,4 +1,4 @@
-.PHONY: prepare all init help dist fmt clean run install release
+.PHONY: prepare all init help dist fmt clean run debug install release
 
 GOCMD       = go
 GOBUILD     = $(GOCMD) build
@@ -18,6 +18,7 @@ VERSION     := 0.9.5
 CURRENT     := $(shell pwd)
 ENTRY       := $(CURRENT)/main.go
 SRCS        := $(shell find . -type f -name '*.go')
+CONF        := $(CURRENT)/apis.json
 GOXOS       := linux
 GOXARCH     := amd64
 GOXOUTPUT   := $(PKGDIR)/$(GOXOS)_$(GOXARCH)/$(NAME)
@@ -34,6 +35,7 @@ help:
 	@echo "    init                       init mod"
 	@echo "    run                        run main file"
 	@echo "    build                      compile on local platform, MacOS etc."
+	@echo "    debug                      run with default option: $(BINDIR)/$(NAME) -conf $(CONF) -port 7001 -debug"
 	@echo "    dist                       compile and generate $(GOXOS)_$(GOXARCH) binary"
 	@echo "    install                    upload $(GOXOUTPUT) to $(INSTALLHOST):$(INSTALLPATH)"
 	@echo "    fmt                        format source code"
@@ -58,6 +60,12 @@ build: init
 	@echo $(subst .go,,$(SRCS))
 	rm -rf $(BINDIR)
 	$(GOBUILD) -o $(BINDIR)/$(NAME) $(SRCS)
+	
+	
+debug: build
+	@echo run with default options
+	@echo $(BINDIR)/$(NAME) -conf $(CONF) -port 7001 -debug
+	$(BINDIR)/$(NAME) -conf $(CONF) -port 7001 -debug
 
 dist: init
 	@echo build $(GOXOS)_$(GOXARCH) binary
